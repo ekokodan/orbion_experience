@@ -1,0 +1,7 @@
+{
+  "name": "Orbion",
+  "description": "An immersive, voice-based language learning experience with a living AI companion.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
