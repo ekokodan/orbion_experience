@@ -4,6 +4,7 @@ import { TopBar } from './components/TopBar';
 import { JourneyMap } from './components/JourneyMap';
 import { ObjectiveCard } from './components/ObjectiveCard';
 import { Transcript } from './components/Transcript';
+import { StarField } from './components/StarField';
 import { GeminiLiveService } from './services/geminiService';
 import { OrbState, Checkpoint, ChatMessage } from './types';
 
@@ -62,12 +63,6 @@ const App: React.FC = () => {
         // Update existing partial
         const updated = [...prev];
         updated[updated.length - 1] = { ...lastMsg, text: lastMsg.text + text, isFinal }; 
-        // Note: Simple concatenation for streaming; deeper logic needed for replace vs append in real implementation
-        // For this demo, we'll assume text chunks are appends. 
-        // *Improvement*: Gemini usually sends full text for input transcription in chunks, let's just replace text for cleaner UI if it seems like a replacement update
-        if (role === 'user') {
-             // Input transcription usually flows in. Let's just append for now.
-        }
         return updated;
       } else {
         // New message
@@ -115,15 +110,9 @@ const App: React.FC = () => {
       service.onCheckpointComplete = handleCheckpointComplete;
       
       service.onTranscriptUpdate = (role, text, isFinal) => {
-          // Debounce / format logic could go here, for now direct pass
-          // We need a slightly more robust way to handle the transcript state to avoid duplicate chars
-          // For the sake of this demo, we will simplify: 
-          // If role matches last message, replace text. If not, push new.
           setMessages(prev => {
             const last = prev[prev.length - 1];
             if (last && last.role === role) {
-                // If it's the same turn, we replace the text with the accumulated text if the API sends accumulated.
-                // However, Gemini Live API sends CHUNKS. So we append.
                 return [...prev.slice(0, -1), { ...last, text: last.text + text }];
             }
             return [...prev, { id: Date.now().toString(), role, text }];
@@ -159,30 +148,33 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full h-screen bg-gradient-to-br from-[#0F0518] via-[#1A0B2E] to-[#000000] overflow-hidden text-white font-sans selection:bg-purple-500/30">
+    <div className="relative w-full h-screen bg-gradient-to-br from-[#05000A] via-[#120520] to-[#0A0410] overflow-hidden text-white font-sans selection:bg-purple-500/30">
       
       {/* Background Ambience */}
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none z-10 mix-blend-soft-light"></div>
+      <StarField stars={[]} />
 
       {/* Main Layout */}
-      <div className="flex flex-col h-full relative z-10">
+      <div className="flex flex-col h-full relative z-20">
         
-        {/* Top Bar */}
-        <TopBar scenarioName="Café in Paris" />
+        {/* Top Bar - Only visible after start for immersion */}
+        <div className={`transition-opacity duration-1000 ${hasStarted ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+             <TopBar scenarioName="Café in Paris" />
+        </div>
 
         {/* Workspace */}
         <div className="flex flex-1 overflow-hidden">
             
             {/* Left Panel: Journey */}
-            <div className="hidden md:flex flex-col justify-center px-8 w-80 relative">
-               {hasStarted && <JourneyMap checkpoints={checkpoints} />}
+            <div className={`hidden md:flex flex-col justify-center px-8 w-80 relative transition-all duration-1000 transform ${hasStarted ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0'}`}>
+               <JourneyMap checkpoints={checkpoints} />
             </div>
 
             {/* Center Stage: Orb & Objective */}
             <div className="flex-1 flex flex-col items-center justify-center relative">
                
                {/* Contextual Tips Floating Area */}
-               <div className="absolute top-12 left-0 right-0 flex justify-center pointer-events-none">
+               <div className="absolute top-12 left-0 right-0 flex justify-center pointer-events-none z-30">
                   {showTips && hasStarted && (
                       <div className="bg-amber-900/40 border border-amber-500/20 text-amber-100/90 px-4 py-2 rounded-full text-sm backdrop-blur-md animate-fade-in shadow-lg">
                           {showTips}
@@ -191,53 +183,67 @@ const App: React.FC = () => {
                </div>
 
                {/* The Orb */}
-               <div className="mb-12 transition-all duration-1000 transform scale-110">
+               <div className={`transition-all duration-1000 transform ${!hasStarted ? 'scale-150 mb-16' : 'scale-100 mb-12'}`}>
                    <Orb state={orbState} volume={orbVolume} />
                </div>
 
                {/* Current Objective / Start Control */}
-               <div className="w-full max-w-lg px-6 flex flex-col items-center gap-6">
+               <div className="w-full max-w-lg px-6 flex flex-col items-center gap-6 z-40">
                   {!hasStarted ? (
-                      <div className="text-center space-y-8">
-                          <h1 className="text-5xl font-serif text-transparent bg-clip-text bg-gradient-to-br from-white to-purple-300">
-                              Orbion
-                          </h1>
-                          <p className="text-white/50 text-lg font-light max-w-sm mx-auto">
-                              Your living guide to fluent conversations.
-                          </p>
-                          {error && <div className="text-red-400 bg-red-900/20 p-2 rounded text-sm">{error}</div>}
+                      <div className="flex flex-col items-center text-center space-y-8 animate-fade-in-up">
+                          <div className="space-y-2">
+                             <div className="text-xs font-bold text-purple-400 tracking-[0.3em] uppercase opacity-0 animate-[fade-in_2s_ease-out_forwards]">
+                                 System Online
+                             </div>
+                             <h1 className="text-7xl md:text-8xl font-thin tracking-tighter text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">
+                                ORBION
+                             </h1>
+                             <p className="text-white/40 font-light tracking-widest text-sm uppercase mt-4">
+                                Immersive Language Intelligence
+                             </p>
+                          </div>
+                          
+                          {error && <div className="text-red-400 bg-red-900/20 border border-red-500/30 px-4 py-2 rounded-lg text-sm">{error}</div>}
+                          
                           <button 
                             onClick={handleStart}
-                            className="px-8 py-4 bg-white text-black rounded-full font-medium hover:scale-105 transition-transform shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+                            className="group relative px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full transition-all duration-500 backdrop-blur-md overflow-hidden"
                           >
-                            Start Session
+                            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                            <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50" />
+                            <span className="relative text-white/90 font-light tracking-[0.2em] uppercase text-xs group-hover:text-white flex items-center gap-3">
+                                <span>Initialize Session</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </span>
                           </button>
                       </div>
                   ) : (
-                      <>
+                      <div className="animate-fade-in">
                         <ObjectiveCard currentCheckpoint={currentCheckpoint} isAllComplete={isAllComplete} />
                         
                         {/* Mic Status / End Button */}
-                        <div className="flex items-center gap-4 mt-4">
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/5 text-xs text-white/40 uppercase tracking-widest">
+                        <div className="flex items-center justify-center gap-4 mt-6">
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/5 text-xs text-white/40 uppercase tracking-widest backdrop-blur-sm">
                                 <div className={`w-2 h-2 rounded-full ${orbState === OrbState.LISTENING ? 'bg-green-400 animate-pulse' : 'bg-white/20'}`} />
                                 {orbState === OrbState.LISTENING ? 'Listening' : 'Mic Active'}
                             </div>
                             <button 
                                 onClick={handleEnd}
-                                className="px-4 py-2 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs border border-red-500/20 transition-colors uppercase tracking-widest"
+                                className="px-4 py-2 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs border border-red-500/20 transition-colors uppercase tracking-widest backdrop-blur-sm"
                             >
-                                End
+                                End Session
                             </button>
                         </div>
-                      </>
+                      </div>
                   )}
                </div>
             </div>
 
             {/* Right Panel: Transcript (Desktop) */}
-            <div className="hidden lg:flex w-80 h-full border-l border-white/5 bg-black/20">
-               {hasStarted && <Transcript messages={messages} />}
+            <div className={`hidden lg:flex w-80 h-full border-l border-white/5 bg-black/20 transition-all duration-1000 transform ${hasStarted ? 'translate-x-0 opacity-100' : 'translate-x-10 opacity-0'}`}>
+               <Transcript messages={messages} />
             </div>
         </div>
       </div>
